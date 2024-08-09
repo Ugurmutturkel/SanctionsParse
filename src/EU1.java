@@ -13,7 +13,6 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import java.security.cert.X509Certificate;
-
 public class EU1 {
 
     public static final String BASE_URL = "https://www.sanctionsmap.eu/api/v1/travelbans/file/";
