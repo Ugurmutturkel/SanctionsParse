@@ -14,9 +14,11 @@ public class UN {
     public static void main(String[] args) {
         String urlString = "https://scsanctions.un.org/consolidated";
         String csvFilePath = "parsed_UN.csv";
+        String csvFileIMOUN = "IMO_UN.csv";
 
         try {
             Document document = Jsoup.connect(urlString).get();
+            writeToCsvIMO(document,csvFileIMOUN);
             writeToCsv(document, csvFilePath);
         } catch (IOException e) {
             e.printStackTrace();
@@ -110,6 +112,51 @@ public class UN {
             e.printStackTrace();
         }
     }
+    
+    static void writeToCsvIMO(Document document, String csvFilePath) {
+        try {
+            File csvFile = new File(csvFilePath);
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(csvFile, StandardCharsets.UTF_8, false))) {
+               
+                writer.write("File,IMOnum,Name");
+                writer.newLine();
+
+                Elements entries = document.select("tr.rowtext");
+
+                for (Element entry : entries) {
+                    String imoNumber = "";
+                    String primaryName = "";
+
+                    Element td = entry.selectFirst("td");
+                    if (td != null) {
+                        String text = td.text();
+
+                        if (text.contains("IMO number:")) {
+                            imoNumber = text.split("IMO number:")[1].split("\\.")[0].trim(); }
+
+                        if (text.contains("Name:")) {
+                            primaryName = text.split("Name:")[1].split("A.k.a.:|F.k.a.:|Address:|Listed on:|Other information:")[0].trim();
+                        }
+                    }
+
+                    if (!imoNumber.isEmpty() && !primaryName.isEmpty()) {
+                        writer.write(String.format("%s,%s,%s",
+                            escapeCsv("UN"), escapeCsv(imoNumber), escapeCsv(primaryName)));
+                        writer.newLine();
+                    }
+                }
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
+
 
     private static String normalizeSpecialChars(String value) {
         if (value == null) return "";

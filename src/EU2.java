@@ -3,12 +3,20 @@ import org.apache.commons.csv.CSVPrinter;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.w3c.dom.*;
+import org.xml.sax.SAXException;
+
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class EU2 {
 
@@ -47,8 +55,10 @@ public class EU2 {
 
                                     String fileName = "EU2_sanctionslist.xml";
                                     downloadFile(accessUrl, fileName);
+                                    String newFileIMO = "IMO_EU2.csv";
 
                                     String newFileName = "parsed_EU2.csv";
+                                    parseXMLAndWriteCSVIMO(fileName,newFileIMO);
                                     parseXMLAndWriteCSV(fileName, newFileName);
 
                                     return;
@@ -176,5 +186,80 @@ public class EU2 {
             e.printStackTrace();
             return false; 
         }
+    }
+    
+    public static boolean parseXMLAndWriteCSVIMO(String xmlFilePath, String csvFilePath) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+
+            File xmlFile = new File(xmlFilePath);
+            Document document = builder.parse(xmlFile);
+            document.getDocumentElement().normalize();
+
+            NodeList sanctionEntityNodes = document.getElementsByTagName("sanctionEntity");
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(csvFilePath));
+                 CSVPrinter csvPrinter = new CSVPrinter(writer,
+                     CSVFormat.DEFAULT.builder()
+                         .setHeader("File", "IMO Number", "Name")
+                         .build())) {
+
+                for (int i = 0; i < sanctionEntityNodes.getLength(); i++) {
+                    Node sanctionEntityNode = sanctionEntityNodes.item(i);
+
+                    if (sanctionEntityNode.getNodeType() == Node.ELEMENT_NODE) {
+                        Element sanctionEntityElement = (Element) sanctionEntityNode;
+
+                        String imoNumber = "null";
+                        NodeList identificationNodes = sanctionEntityElement.getElementsByTagName("identification");
+                        for (int j = 0; j < identificationNodes.getLength(); j++) {
+                            Element identificationElement = (Element) identificationNodes.item(j);
+                            if ("imo".equals(identificationElement.getAttribute("identificationTypeCode"))) {
+                                imoNumber = identificationElement.getAttribute("number").trim();
+                                break;
+                            }
+                        }
+
+                        if (!"null".equals(imoNumber)) {
+                            String primaryName = "null";
+                            NodeList nameAliasNodes = sanctionEntityElement.getElementsByTagName("nameAlias");
+                            for (int j = 0; j < nameAliasNodes.getLength(); j++) {
+                                Element nameAliasElement = (Element) nameAliasNodes.item(j);
+                                String wholeName = nameAliasElement.getAttribute("wholeName").replace("\"", "").trim();
+                                if (!wholeName.isEmpty()) {
+                                    primaryName = wholeName;
+                                    break;
+                                    
+                                }
+                                
+                            }
+
+                            csvPrinter.printRecord("EU2", imoNumber, primaryName);
+                        }
+                    }
+                }
+            }
+
+            System.out.println("CSV file created successfully for XML file: " + xmlFilePath);
+            return true; 
+        } catch (ParserConfigurationException | SAXException | IOException e) {
+            e.printStackTrace();
+            return false; 
+        }
+}
+    public static List<String[]> extractImoNumbersAndNames(String remarkText) {
+        List<String[]> imoData = new ArrayList<>();
+        
+        Pattern pattern = Pattern.compile("IMO Number: (\\d+)[^0-9]*?([\\w\\s]+?)(?:\\d{7}|$)", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(remarkText);
+        
+        while (matcher.find()) {
+            String imoNumber = matcher.group(1).trim();
+            String name = matcher.group(2).trim();
+            imoData.add(new String[]{imoNumber, name});
+        }
+        
+        return imoData;
     }
 }

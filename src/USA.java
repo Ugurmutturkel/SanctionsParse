@@ -10,6 +10,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class USA {
 
@@ -98,7 +100,102 @@ public class USA {
             e.printStackTrace();
         }
     }
+        
+    public static void parseCSVIMO(String fileName, List<String> names, List<String> imoNumbers) {
+        try (CSVReader reader = new CSVReader(new FileReader(fileName))) {
+            String[] headers;
+            try {
+                headers = reader.readNext();
+            } catch (Exception e) {
+                e.printStackTrace();
+                return;
+            }
 
+            if (headers == null) {
+                System.out.println("Empty CSV file");
+                return;
+            }
+
+            int typeIndex = -1;
+            int nameIndex = -1;
+            int idsIndex = -1;
+
+            for (int i = 0; i < headers.length; i++) {
+                if (headers[i].equalsIgnoreCase("type")) {
+                    typeIndex = i;
+                } else if (headers[i].equalsIgnoreCase("name")) {
+                    nameIndex = i;
+                } else if (headers[i].equalsIgnoreCase("ids")) { 
+                    idsIndex = i;
+                }
+            }
+
+            if (typeIndex == -1 || nameIndex == -1 || idsIndex == -1) {
+                System.out.println("\"type\", \"name\", or \"ids\" column not found");
+                return;
+            }
+
+            String[] fields;
+            while (true) {
+                try {
+                    fields = reader.readNext();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    continue;
+                }
+
+                if (fields == null) {
+                    break;
+                }
+
+                if (fields.length > typeIndex && fields.length > nameIndex && fields.length > idsIndex) {
+                    String typeValue = removeURLsAndQuotes(fields[typeIndex]).trim();
+                    if (typeValue.equalsIgnoreCase("vessel")) {
+                        names.add(removeURLsAndQuotes(fields[nameIndex]));
+                        imoNumbers.add(extractIMONumber(fields[idsIndex]));
+                    }
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    public static void writeCSVIMO(String fileName, List<String> imoNumbers, List<String> names) {
+        try (FileWriter writer = new FileWriter(fileName, StandardCharsets.UTF_8)) {
+            writer.write("File,IMOnum,Name\n");
+
+            for (int i = 0; i < imoNumbers.size(); i++) {
+                String imoNumber = imoNumbers.get(i);
+                String name = names.get(i);
+
+                if (imoNumber == null || imoNumber.trim().isEmpty()) {
+                    imoNumber = "null";
+                }
+
+                writer.write(String.join(",", escapeCsv("USA"), escapeCsv(imoNumber), escapeCsv(name)));
+                writer.write("\n");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
+    public static String extractIMONumber(String idsText) {
+        if (idsText == null || idsText.isEmpty()) {
+            return "";
+        }
+
+        Pattern pattern = Pattern.compile("IMO (\\d{7})");
+        Matcher matcher = pattern.matcher(idsText);
+
+        if (matcher.find()) {
+            return matcher.group(1); 
+        }
+        return "";
+    }
+
+    
     public static String removeURLsAndQuotes(String text) {
         return text.replaceAll("http[s]?://\\S+", "").replace("\"", "").trim();
     }
@@ -151,5 +248,13 @@ public class USA {
         System.out.println("Writing CSV File...");
         writeCSVFile(outputFileName, countries, types, names, altNames);
         System.out.println("Done");
+        //IMO part
+        List<String> namesimo = new ArrayList<>();
+        List<String> imoNumbers = new ArrayList<>();
+
+        System.out.println("Parsing CSV File...");
+        parseCSVIMO(inputFileName, namesimo, imoNumbers);
+        String outputFileNameimo = "IMO_USA.csv";
+        writeCSVIMO(outputFileNameimo, imoNumbers, namesimo);
     }
 }

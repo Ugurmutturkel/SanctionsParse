@@ -13,9 +13,11 @@ public class UK {
     public static void main(String[] args) {
         String urlString = "https://docs.fcdo.gov.uk/docs/UK-Sanctions-List.html";
         String csvFilePath = "parsed_UK.csv";
+        String csvFilePathIMO = "IMO_UK.csv";
 
         try {
             Document document = Jsoup.connect(urlString).get();
+            writeToCsvIMO(document,csvFilePathIMO);
             writeToCsv(document, csvFilePath);
         } catch (IOException e) {
             e.printStackTrace();
@@ -139,6 +141,69 @@ public class UK {
             e.printStackTrace();
         }
     }
+    
+    static void writeToCsvIMO(Document document, String csvFilePath) {
+        try {
+            File csvFile = new File(csvFilePath);
+            boolean fileExists = csvFile.exists();
+
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(csvFile, false))) { 
+                if (!fileExists) {
+                    writer.write("File,IMOnum,Name");
+                    writer.newLine();
+                }
+
+                Elements divs = document.select("div");
+
+                String imoNumber = null;
+                String primaryName = null;
+                boolean isShip = false;
+                writer.write("File,IMOnum,Name");
+                writer.newLine();
+
+                for (Element div : divs) {
+                    String divText = div.text().trim();
+
+                    if (divText.contains("- Ship")) {
+                        isShip = true;
+                    }
+
+                    if (isShip && divText.contains("IMO Numbers:")) {
+                        Element imoElement = div.selectFirst("span");
+                        if (imoElement != null) {
+                            imoNumber = imoElement.text().trim();
+                            System.out.println("Found IMO Number: " + imoNumber);
+                        }
+                    }
+
+                    if (isShip && divText.contains("Name Type: Primary name")) {
+                        Element nameElement = div.selectFirst("span");
+                        if (nameElement != null) {
+                            primaryName = nameElement.text().trim();
+                            System.out.println("Found Primary Name: " + primaryName);
+                        }
+                    }
+
+                    if (imoNumber != null && primaryName != null) {
+                    	
+                        writer.write(String.format("%s,%s,%s", escapeCsv("UK"), escapeCsv(imoNumber), escapeCsv(primaryName)));
+                        writer.newLine();
+
+                        imoNumber = null;
+                        primaryName = null;
+                        isShip = false;
+                    }
+                }
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+
 
     private static String escapeCsv(String value) {
         if (value == null) return "";

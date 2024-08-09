@@ -25,15 +25,26 @@ public class Main {
     	callUN();
     	callEU1();
     	callEU2();
+    	callSDN();
+    	String[] inputIMOFiles = {
+    			"IMO_USA.csv",
+    			"IMO_UK.csv",
+    			"IMO_UN.csv",
+    			"IMO_EU2.csv",
+    			"IMO_SDN.csv"
+    	};
         String[] inputFiles = {
             "parsed_USA.csv",
             "parsed_UK.csv",
             "parsed_UN.csv",
             "parsed_EU1.csv",
-            "parsed_EU2.csv"
+            "parsed_EU2.csv",
+            "parsed_SDN.csv"
         };
+        String outputIMOFile = "IMO_Combined.csv";
         String outputFile = "SanctionsParsed.csv";
-
+        
+        combineCSVFiles(inputIMOFiles,outputIMOFile);
         combineCSVFiles(inputFiles, outputFile);
     }
 
@@ -86,13 +97,23 @@ public class Main {
 
          USA.writeCSVFile(outputFileNameUSA, countries, types, names, altNames);
          System.out.println("USA Done");
+         //IMO part
+         List<String> namesimo = new ArrayList<>();
+         List<String> imoNumbers = new ArrayList<>();
+
+         System.out.println("Parsing CSV File...");
+         USA.parseCSVIMO(inputFileNameUSA, namesimo, imoNumbers);
+         String outputFileNameimo = "IMO_USA.csv";
+         USA.writeCSVIMO(outputFileNameimo, imoNumbers, namesimo);
     }
     public static void callUK() {
         String urlStringUK = "https://docs.fcdo.gov.uk/docs/UK-Sanctions-List.html";
         String csvFilePathUK = "parsed_UK.csv";
+        String csvFilePathIMO = "IMO_UK.csv";
 
         try {
             Document document = Jsoup.connect(urlStringUK).get();
+            UK.writeToCsvIMO(document,csvFilePathIMO);
             UK.writeToCsv(document, csvFilePathUK);
         } catch (IOException e) {
             e.printStackTrace();
@@ -102,9 +123,13 @@ public class Main {
     public static void callUN() {
         String urlStringUN = "https://scsanctions.un.org/consolidated";
         String csvFilePathUN = "parsed_UN.csv";
+        String csvFileIMOUN = "IMO_UN.csv";
+
+            
 
         try {
             Document document = Jsoup.connect(urlStringUN).get();
+            UN.writeToCsvIMO(document,csvFileIMOUN);
             UN.writeToCsv(document, csvFilePathUN);
         } catch (IOException e) {
             e.printStackTrace();
@@ -182,6 +207,10 @@ public class Main {
                                     EU2.downloadFile(accessUrl, fileName);
 
                                     String newFileName = "parsed_EU2.csv";
+                                    String newFileIMO = "IMO_EU2.csv";
+
+                                    
+                                    EU2.parseXMLAndWriteCSVIMO(fileName,newFileIMO);
                                     EU2.parseXMLAndWriteCSV(fileName, newFileName);
                                     System.out.println("EU2 Done");
 
@@ -197,6 +226,29 @@ public class Main {
 
         } catch (Exception e) {
             e.printStackTrace();
-        } 
+        } }
+        
+        public static void callSDN() {
+        	 final String input_url = "https://www.treasury.gov/ofac/downloads/sdn.csv";
+        	    final String temp_file = "sdn.csv";
+        	    final String output_file = "Parsed_SDN.csv";
+        	    final String output_imo ="IMO_SDN.csv";
+        	    
+        	    
+
+        	    
+        	        try {
+        	            SDN.setupSslContext();
+        	            
+        	            SDN.downloadFile(input_url, temp_file);
+
+        	            SDN.processCSVIMO(temp_file,output_imo);
+        	            SDN.processCSV(temp_file, output_file);
+
+        	            System.out.println("Processing complete. Output written to " + output_file);
+        	        } catch (IOException e) {
+        	            e.printStackTrace();
+        	        }
+        
     }
 }
